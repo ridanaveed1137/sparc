@@ -1,6 +1,0 @@
-
-> secure-emp-system@1.0.0 start
-> node src/app.js
-
-◇ injected env (5) from .env // tip: ⌁ auth for agents [www.vestauth.com]
-Server running on http://localhost:4000
