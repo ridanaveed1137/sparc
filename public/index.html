@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Secure Emp System — Login</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+  }
+  .card {
+    background: #1e293b;
+    padding: 2.5rem;
+    border-radius: 12px;
+    width: 340px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  }
+  h1 { font-size: 1.3rem; margin-bottom: 1.5rem; color: #f8fafc; }
+  label { font-size: 0.85rem; color: #94a3b8; display: block; margin-bottom: 0.3rem; }
+  input {
+    width: 100%;
+    padding: 0.6rem;
+    margin-bottom: 1rem;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    background: #0f172a;
+    color: #e2e8f0;
+  }
+  button {
+    width: 100%;
+    padding: 0.7rem;
+    background: #3b82f6;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { background: #2563eb; }
+  .error { color: #f87171; font-size: 0.85rem; margin-top: 0.8rem; min-height: 1.2rem; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔒 Secure Emp System</h1>
+    <label for="employeeId">Employee ID</label>
+    <input id="employeeId" placeholder="admin001" />
+    <label for="password">Password</label>
+    <input id="password" type="password" placeholder="••••••••" />
+    <button onclick="login()">Log In</button>
+    <div class="error" id="error"></div>
+  </div>
+
+<script>
+async function login() {
+  const employeeId = document.getElementById('employeeId').value;
+  const password = document.getElementById('password').value;
+  const errorEl = document.getElementById('error');
+  errorEl.textContent = '';
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ employeeId, password }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      errorEl.textContent = data.error || 'Login failed';
+      return;
+    }
+
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('role', data.user.role);
+    localStorage.setItem('fullName', data.user.fullName);
+
+    if (data.user.role === 'admin' || data.user.role === 'manager') {
+      window.location.href = '/dashboard.html';
+    } else {
+      window.location.href = '/employee.html';
+    }
+  } catch (err) {
+    errorEl.textContent = 'Could not reach server';
+  }
+}
+
+document.getElementById('password').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') login();
+});
+</script>
+</body>
+</html>

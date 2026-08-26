@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Admin Dashboard</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 2rem;
+  }
+  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+  h1 { font-size: 1.4rem; margin: 0; }
+  .user-info { font-size: 0.85rem; color: #94a3b8; }
+  .logout { color: #f87171; cursor: pointer; margin-left: 1rem; }
+
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem; }
+  .stat {
+    background: #1e293b;
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-align: center;
+  }
+  .stat .num { font-size: 1.8rem; font-weight: 700; color: #f8fafc; }
+  .stat .label { font-size: 0.8rem; color: #94a3b8; margin-top: 0.3rem; }
+  .stat.critical .num { color: #f87171; }
+  .stat.warning .num { color: #fbbf24; }
+
+  .section {
+    background: #1e293b;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .section h2 { font-size: 1rem; margin-top: 0; margin-bottom: 1rem; color: #f8fafc; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #334155; }
+  th { color: #94a3b8; font-weight: 500; }
+  .badge {
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .badge.critical { background: #7f1d1d; color: #fecaca; }
+  .badge.warning { background: #78350f; color: #fde68a; }
+  .badge.info { background: #164e63; color: #a5f3fc; }
+
+  .form-row { display: flex; gap: 0.6rem; margin-bottom: 0.8rem; flex-wrap: wrap; }
+  input {
+    padding: 0.5rem;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    background: #0f172a;
+    color: #e2e8f0;
+    flex: 1;
+    min-width: 140px;
+  }
+  button {
+    padding: 0.5rem 1rem;
+    background: #3b82f6;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { background: #2563eb; }
+  button.small { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+  .msg { font-size: 0.85rem; margin-top: 0.5rem; }
+  .msg.ok { color: #4ade80; }
+  .msg.err { color: #f87171; }
+
+  .integrity-ok { color: #4ade80; }
+  .integrity-bad { color: #f87171; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔒 Admin Dashboard</h1>
+  <div class="user-info">
+    <span id="whoami"></span>
+    <span class="logout" onclick="logout()">Log out</span>
+  </div>
+</header>
+
+<div class="grid" id="statGrid"></div>
+
+<div class="section">
+  <h2>Recent Alerts (warnings &amp; critical events)</h2>
+  <table id="alertsTable">
+    <thead><tr><th>Time</th><th>Event</th><th>Actor</th><th>IP</th><th>Severity</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h2>Security Policies</h2>
+  <table id="policiesTable">
+    <thead><tr><th>Policy</th><th>Value</th><th>Description</th><th></th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h2>Add Employee</h2>
+  <div class="form-row">
+    <input id="newEmpId" placeholder="Employee ID (e.g. emp002)" />
+    <input id="newFullName" placeholder="Full Name" />
+    <input id="newEmail" placeholder="Email" />
+    <input id="newPassword" type="password" placeholder="Temp Password" />
+    <select id="newRole" style="padding:0.5rem;border-radius:6px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;">
+      <option value="employee">Employee</option>
+      <option value="manager">Manager</option>
+      <option value="admin">Admin</option>
+    </select>
+    <button onclick="createEmployee()">Add</button>
+  </div>
+  <div class="msg" id="createMsg"></div>
+</div>
+
+<div class="section">
+  <h2>Audit Chain Integrity</h2>
+  <button class="small" onclick="checkIntegrity()">Verify Chain</button>
+  <span id="integrityResult" style="margin-left:1rem;"></span>
+</div>
+
+<script>
+const token = localStorage.getItem('token');
+if (!token) window.location.href = '/index.html';
+
+document.getElementById('whoami').textContent =
+  `${localStorage.getItem('fullName')} (${localStorage.getItem('role')})`;
+
+function authHeaders(extra = {}) {
+  return { Authorization: `Bearer ${token}`, ...extra };
+}
+
+function logout() {
+  localStorage.clear();
+  window.location.href = '/index.html';
+}
+
+async function apiGet(url) {
+  const res = await fetch(url, { headers: authHeaders() });
+  if (res.status === 401) { logout(); return null; }
+  return res.json();
+}
+
+function severityBadge(sev) {
+  return `<span class="badge ${sev}">${sev}</span>`;
+}
+
+async function loadSummary() {
+  const s = await apiGet('/api/dashboard/summary');
+  if (!s) return;
+  const grid = document.getElementById('statGrid');
+  grid.innerHTML = `
+    <div class="stat"><div class="num">${s.totalUsers}</div><div class="label">Total Users</div></div>
+    <div class="stat warning"><div class="num">${s.lockedUsers}</div><div class="label">Locked Accounts</div></div>
+    <div class="stat critical"><div class="num">${s.criticalAlerts}</div><div class="label">Critical Alerts</div></div>
+    <div class="stat warning"><div class="num">${s.warningAlerts}</div><div class="label">Warnings</div></div>
+  `;
+}
+
+async function loadAlerts() {
+  const alerts = await apiGet('/api/dashboard/alerts');
+  if (!alerts) return;
+  const tbody = document.querySelector('#alertsTable tbody');
+  tbody.innerHTML = alerts.slice(0, 20).map(a => `
+    <tr>
+      <td>${new Date(a.timestamp).toLocaleString()}</td>
+      <td>${a.eventType}</td>
+      <td>${a.actorId || '-'}</td>
+      <td>${a.ipAddress || '-'}</td>
+      <td>${severityBadge(a.severity)}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5">No alerts yet.</td></tr>';
+}
+
+async function loadPolicies() {
+  const policies = await apiGet('/api/policies');
+  if (!policies) return;
+  const tbody = document.querySelector('#policiesTable tbody');
+  tbody.innerHTML = policies.map(p => `
+    <tr>
+      <td>${p.key}</td>
+      <td><input value="${p.value}" id="policy-${p.key}" style="width:100px;" /></td>
+      <td>${p.description || ''}</td>
+      <td><button class="small" onclick="updatePolicy('${p.key}')">Save</button></td>
+    </tr>
+  `).join('');
+}
+
+async function updatePolicy(key) {
+  const value = document.getElementById(`policy-${key}`).value;
+  const res = await fetch(`/api/policies/${key}`, {
+    method: 'PUT',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ value }),
+  });
+  if (res.ok) {
+    loadAlerts();
+    loadSummary();
+  }
+}
+
+async function createEmployee() {
+  const employeeId = document.getElementById('newEmpId').value;
+  const fullName = document.getElementById('newFullName').value;
+  const email = document.getElementById('newEmail').value;
+  const password = document.getElementById('newPassword').value;
+  const role = document.getElementById('newRole').value;
+  const msgEl = document.getElementById('createMsg');
+
+  const res = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ employeeId, fullName, email, password, role }),
+  });
+  const data = await res.json();
+
+  if (res.ok) {
+    msgEl.textContent = `✅ Created ${data.employeeId} (${data.role})`;
+    msgEl.className = 'msg ok';
+    document.getElementById('newEmpId').value = '';
+    document.getElementById('newFullName').value = '';
+    document.getElementById('newEmail').value = '';
+    document.getElementById('newPassword').value = '';
+    loadSummary();
+  } else {
+    msgEl.textContent = `❌ ${data.error || (data.errors && data.errors[0].msg) || 'Failed'}`;
+    msgEl.className = 'msg err';
+  }
+}
+
+async function checkIntegrity() {
+  const result = await apiGet('/api/dashboard/integrity');
+  const el = document.getElementById('integrityResult');
+  if (!result) return;
+  if (result.valid) {
+    el.textContent = '✅ Chain is intact — no tampering detected';
+    el.className = 'integrity-ok';
+  } else {
+    el.textContent = `❌ Tampering detected at entry #${result.brokenAtId} (${result.reason})`;
+    el.className = 'integrity-bad';
+  }
+}
+
+loadSummary();
+loadAlerts();
+loadPolicies();
+
+// Auto-refresh every 10s so alerts feel "live"
+setInterval(() => { loadSummary(); loadAlerts(); }, 10000);
+</script>
+</body>
+</html>

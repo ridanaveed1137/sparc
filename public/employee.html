@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Employee Portal</title>
+<style>
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    flex-direction: column;
+  }
+  h1 { color: #f8fafc; }
+  p { color: #94a3b8; }
+  .logout { color: #f87171; cursor: pointer; margin-top: 1rem; }
+</style>
+</head>
+<body>
+  <h1 id="greeting">Welcome</h1>
+  <p>You're logged in with limited (employee-level) access.</p>
+  <p>Admin tools are not available to your role.</p>
+  <div class="logout" onclick="logout()">Log out</div>
+
+<script>
+if (!localStorage.getItem('token')) window.location.href = '/index.html';
+document.getElementById('greeting').textContent =
+  `Welcome, ${localStorage.getItem('fullName')}`;
+function logout() {
+  localStorage.clear();
+  window.location.href = '/index.html';
+}
+</script>
+</body>
+</html>
