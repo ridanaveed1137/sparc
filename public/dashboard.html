@@ -60,6 +60,13 @@
     flex: 1;
     min-width: 140px;
   }
+  select {
+    padding: 0.5rem;
+    border-radius: 6px;
+    background: #0f172a;
+    color: #e2e8f0;
+    border: 1px solid #334155;
+  }
   button {
     padding: 0.5rem 1rem;
     background: #3b82f6;
@@ -85,7 +92,7 @@
   <h1>🔒 Admin Dashboard</h1>
   <div class="user-info">
     <span id="whoami"></span>
-    <span class="logout" onclick="logout()">Log out</span>
+    <span class="logout" id="logoutBtn">Log out</span>
   </div>
 </header>
 
@@ -114,150 +121,22 @@
     <input id="newFullName" placeholder="Full Name" />
     <input id="newEmail" placeholder="Email" />
     <input id="newPassword" type="password" placeholder="Temp Password" />
-    <select id="newRole" style="padding:0.5rem;border-radius:6px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;">
+    <select id="newRole">
       <option value="employee">Employee</option>
       <option value="manager">Manager</option>
       <option value="admin">Admin</option>
     </select>
-    <button onclick="createEmployee()">Add</button>
+    <button id="addEmployeeBtn">Add</button>
   </div>
   <div class="msg" id="createMsg"></div>
 </div>
 
 <div class="section">
   <h2>Audit Chain Integrity</h2>
-  <button class="small" onclick="checkIntegrity()">Verify Chain</button>
+  <button class="small" id="verifyChainBtn">Verify Chain</button>
   <span id="integrityResult" style="margin-left:1rem;"></span>
 </div>
 
-<script>
-const token = localStorage.getItem('token');
-if (!token) window.location.href = '/index.html';
-
-document.getElementById('whoami').textContent =
-  `${localStorage.getItem('fullName')} (${localStorage.getItem('role')})`;
-
-function authHeaders(extra = {}) {
-  return { Authorization: `Bearer ${token}`, ...extra };
-}
-
-function logout() {
-  localStorage.clear();
-  window.location.href = '/index.html';
-}
-
-async function apiGet(url) {
-  const res = await fetch(url, { headers: authHeaders() });
-  if (res.status === 401) { logout(); return null; }
-  return res.json();
-}
-
-function severityBadge(sev) {
-  return `<span class="badge ${sev}">${sev}</span>`;
-}
-
-async function loadSummary() {
-  const s = await apiGet('/api/dashboard/summary');
-  if (!s) return;
-  const grid = document.getElementById('statGrid');
-  grid.innerHTML = `
-    <div class="stat"><div class="num">${s.totalUsers}</div><div class="label">Total Users</div></div>
-    <div class="stat warning"><div class="num">${s.lockedUsers}</div><div class="label">Locked Accounts</div></div>
-    <div class="stat critical"><div class="num">${s.criticalAlerts}</div><div class="label">Critical Alerts</div></div>
-    <div class="stat warning"><div class="num">${s.warningAlerts}</div><div class="label">Warnings</div></div>
-  `;
-}
-
-async function loadAlerts() {
-  const alerts = await apiGet('/api/dashboard/alerts');
-  if (!alerts) return;
-  const tbody = document.querySelector('#alertsTable tbody');
-  tbody.innerHTML = alerts.slice(0, 20).map(a => `
-    <tr>
-      <td>${new Date(a.timestamp).toLocaleString()}</td>
-      <td>${a.eventType}</td>
-      <td>${a.actorId || '-'}</td>
-      <td>${a.ipAddress || '-'}</td>
-      <td>${severityBadge(a.severity)}</td>
-    </tr>
-  `).join('') || '<tr><td colspan="5">No alerts yet.</td></tr>';
-}
-
-async function loadPolicies() {
-  const policies = await apiGet('/api/policies');
-  if (!policies) return;
-  const tbody = document.querySelector('#policiesTable tbody');
-  tbody.innerHTML = policies.map(p => `
-    <tr>
-      <td>${p.key}</td>
-      <td><input value="${p.value}" id="policy-${p.key}" style="width:100px;" /></td>
-      <td>${p.description || ''}</td>
-      <td><button class="small" onclick="updatePolicy('${p.key}')">Save</button></td>
-    </tr>
-  `).join('');
-}
-
-async function updatePolicy(key) {
-  const value = document.getElementById(`policy-${key}`).value;
-  const res = await fetch(`/api/policies/${key}`, {
-    method: 'PUT',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ value }),
-  });
-  if (res.ok) {
-    loadAlerts();
-    loadSummary();
-  }
-}
-
-async function createEmployee() {
-  const employeeId = document.getElementById('newEmpId').value;
-  const fullName = document.getElementById('newFullName').value;
-  const email = document.getElementById('newEmail').value;
-  const password = document.getElementById('newPassword').value;
-  const role = document.getElementById('newRole').value;
-  const msgEl = document.getElementById('createMsg');
-
-  const res = await fetch('/api/auth/register', {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ employeeId, fullName, email, password, role }),
-  });
-  const data = await res.json();
-
-  if (res.ok) {
-    msgEl.textContent = `✅ Created ${data.employeeId} (${data.role})`;
-    msgEl.className = 'msg ok';
-    document.getElementById('newEmpId').value = '';
-    document.getElementById('newFullName').value = '';
-    document.getElementById('newEmail').value = '';
-    document.getElementById('newPassword').value = '';
-    loadSummary();
-  } else {
-    msgEl.textContent = `❌ ${data.error || (data.errors && data.errors[0].msg) || 'Failed'}`;
-    msgEl.className = 'msg err';
-  }
-}
-
-async function checkIntegrity() {
-  const result = await apiGet('/api/dashboard/integrity');
-  const el = document.getElementById('integrityResult');
-  if (!result) return;
-  if (result.valid) {
-    el.textContent = '✅ Chain is intact — no tampering detected';
-    el.className = 'integrity-ok';
-  } else {
-    el.textContent = `❌ Tampering detected at entry #${result.brokenAtId} (${result.reason})`;
-    el.className = 'integrity-bad';
-  }
-}
-
-loadSummary();
-loadAlerts();
-loadPolicies();
-
-// Auto-refresh every 10s so alerts feel "live"
-setInterval(() => { loadSummary(); loadAlerts(); }, 10000);
-</script>
+<script src="/dashboard.js"></script>
 </body>
 </html>

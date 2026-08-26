@@ -24,16 +24,7 @@
   <h1 id="greeting">Welcome</h1>
   <p>You're logged in with limited (employee-level) access.</p>
   <p>Admin tools are not available to your role.</p>
-  <div class="logout" onclick="logout()">Log out</div>
-
-<script>
-if (!localStorage.getItem('token')) window.location.href = '/index.html';
-document.getElementById('greeting').textContent =
-  `Welcome, ${localStorage.getItem('fullName')}`;
-function logout() {
-  localStorage.clear();
-  window.location.href = '/index.html';
-}
-</script>
+  <div class="logout" id="logoutBtn">Log out</div>
+  <script src="/employee.js"></script>
 </body>
 </html>

@@ -13,14 +13,7 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const app = express();
 
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-      "script-src": ["'self'"],
-    },
-  },
-}));
+app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use(express.static(require('path').join(__dirname, '../public')));
